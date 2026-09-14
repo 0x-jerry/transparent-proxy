@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Transparent Proxy</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  h1 { margin: 0 0 .25rem; font-size: 1.9rem; }
+  h2 { margin: 2rem 0 .5rem; font-size: 1.1rem; }
+  p.lead { margin: 0 0 1.5rem; opacity: .75; }
+  form { display: flex; gap: .5rem; flex-wrap: wrap; }
+  label { flex: 1 1 100%; font-weight: 600; font-size: .85rem; }
+  input, button {
+    font: inherit;
+    padding: .6rem .75rem;
+    border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+  }
+  input { flex: 1 1 22rem; }
+  button { cursor: pointer; font-weight: 600; }
+  button:hover { border-color: currentColor; }
+  code, pre, .preview {
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: .9rem;
+  }
+  .preview {
+    display: block;
+    padding: .75rem;
+    margin-top: 1rem;
+    border: 1px dashed color-mix(in srgb, currentColor 30%, transparent);
+    border-radius: 8px;
+    word-break: break-all;
+  }
+  pre {
+    padding: .75rem;
+    overflow-x: auto;
+    border-radius: 8px;
+    background: color-mix(in srgb, currentColor 8%, transparent);
+  }
+  ul { padding-left: 1.2rem; }
+  li { margin: .25rem 0; }
+  footer { margin-top: 3rem; font-size: .85rem; opacity: .6; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Transparent Proxy</h1>
+  <p class="lead">Fetch any <code>http(s)</code> URL through this server.</p>
+
+  <form id="form">
+    <label for="u">Target URL</label>
+    <input id="u" type="url" placeholder="https://proxy.com/xxx" autocomplete="off" required>
+    <button type="submit" id="copy">Copy</button>
+  </form>
+
+  <span class="preview">Request: <span id="preview"></span></span>
+
+  <h2>How it works</h2>
+  <p>
+    Pass the target as the <code>url</code> query parameter. The server fetches it
+    and streams the response back, CORS-enabled, so browser code can read it.
+  </p>
+
+  <h2>Examples</h2>
+  <pre><code>curl '<span class="origin"></span>/?url=https://example.com'
+curl -I '<span class="origin"></span>/?url=https://httpbin.org/get'
+curl '<span class="origin"></span>/?url=https://api.github.com'</code></pre>
+
+  <h2>Notes</h2>
+  <ul>
+    <li>Methods: <code>GET</code> and <code>HEAD</code> only; <code>OPTIONS</code> answers preflight.</li>
+    <li>Redirects and upstream status codes are passed through untouched.</li>
+    <li>Response bodies are streamed, so large files work.</li>
+    <li>Configuration is via environment variables: <code>PROXY_ADDR</code>, <code>PROXY_TIMEOUT</code>, <code>PROXY_INSECURE_TLS</code>, <code>PROXY_CORS</code>.</li>
+  </ul>
+
+  <footer>transparent-proxy</footer>
+</main>
+<script>
+  const form = document.getElementById('form');
+  const input = document.getElementById('u');
+  const preview = document.getElementById('preview');
+  const button = document.getElementById('copy');
+  const origin = location.origin;
+  const fallback = 'https://proxy.com/xxx';
+
+  document.querySelectorAll('.origin').forEach(el => { el.textContent = origin; });
+
+  function requestURL() {
+    return origin + '/?url=' + encodeURIComponent(input.value.trim() || fallback);
+  }
+
+  function render() {
+    preview.textContent = requestURL();
+  }
+
+  async function copy(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand('copy');
+    area.remove();
+  }
+
+  input.addEventListener('input', render);
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    try {
+      await copy(requestURL());
+      button.textContent = 'Copied';
+    } catch {
+      button.textContent = 'Copy failed';
+    }
+    setTimeout(() => { button.textContent = 'Copy'; }, 1500);
+  });
+  render();
+</script>
+</body>
+</html>
