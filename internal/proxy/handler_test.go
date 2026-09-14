@@ -64,23 +64,25 @@ func TestProxyStripsClientIPHeaders(t *testing.T) {
 	defer upstream.Close()
 
 	rec := proxyRequest(t, newHandler(false), http.MethodGet, upstream.URL, http.Header{
-		"X-Forwarded-For": {"203.0.113.7"},
-		"X-Real-Ip":       {"203.0.113.7"},
-		"Forwarded":       {"for=203.0.113.7"},
+		"X-Forwarded-For":  {"203.0.113.7"},
+		"X-Forwarded-Host": {"evil.example"},
+		"X-Real-Ip":        {"203.0.113.7"},
+		"Forwarded":        {"for=203.0.113.7"},
+		"Cf-Connecting-Ip": {"203.0.113.7"},
 	})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 
 	received := <-headers
-	for _, name := range []string{"X-Forwarded-For", "X-Real-Ip", "Forwarded"} {
+	for _, name := range []string{"X-Forwarded-For", "X-Forwarded-Host", "X-Real-Ip", "Forwarded", "Cf-Connecting-Ip"} {
 		if got := received.Get(name); got != "" {
 			t.Errorf("%s = %q, want stripped", name, got)
 		}
 	}
 }
 
-func TestProxyForwardsRemoteIPWhenRequested(t *testing.T) {
+func TestProxyForwardsRemoteIdentityWhenRequested(t *testing.T) {
 	headers := make(chan http.Header, 1)
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		headers <- r.Header.Clone()
@@ -88,19 +90,20 @@ func TestProxyForwardsRemoteIPWhenRequested(t *testing.T) {
 	defer upstream.Close()
 
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/?url="+url.QueryEscape(upstream.URL)+"&forward_ip=true", nil)
+	req := httptest.NewRequest(http.MethodGet, "/?url="+url.QueryEscape(upstream.URL)+"&forward=true", nil)
 	req.Header.Set("X-Forwarded-For", "203.0.113.7")
+	req.Header.Set("X-Real-Ip", "203.0.113.7")
 	newHandler(true).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
 	received := <-headers
-	if got := received.Get("X-Forwarded-For"); got != "192.0.2.1" {
-		t.Errorf("X-Forwarded-For = %q, want the remote address", got)
+	if got := received.Values("X-Forwarded-For"); len(got) != 2 || got[0] != "203.0.113.7" || got[1] != "192.0.2.1" {
+		t.Errorf("X-Forwarded-For = %v, want the client chain plus the remote address", got)
 	}
-	if got := received.Get("X-Real-Ip"); got != "" {
-		t.Errorf("X-Real-Ip = %q, want stripped", got)
+	if got := received.Get("X-Real-Ip"); got != "203.0.113.7" {
+		t.Errorf("X-Real-Ip = %q, want forwarded untouched", got)
 	}
 }
 

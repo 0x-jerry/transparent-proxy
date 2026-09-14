@@ -64,7 +64,7 @@
     <button type="submit" id="copy">Copy</button>
     <label class="check" for="forward">
       <input id="forward" type="checkbox">
-      Include client IP (<code>forward_ip=true</code>)
+      Forward client identity (<code>forward=true</code>)
     </label>
   </form>
 
@@ -85,7 +85,7 @@ curl '<span class="origin"></span>/?url=https://api.github.com'</code></pre>
   <ul>
     <li>Methods: <code>GET</code> and <code>HEAD</code> only; <code>OPTIONS</code> answers preflight.</li>
     <li>Redirects and upstream status codes are passed through untouched.</li>
-    <li>The client IP is stripped; append <code>&amp;forward_ip=true</code> to send it as <code>X-Forwarded-For</code>.</li>
+    <li>Remote identity headers are stripped; append <code>&amp;forward=true</code> to forward them and add the caller's address as <code>X-Forwarded-For</code>.</li>
     <li>Response bodies are streamed, so large files work.</li>
     <li>Configuration is via environment variables: <code>PROXY_ADDR</code>, <code>PROXY_TIMEOUT</code>, <code>PROXY_INSECURE_TLS</code>, <code>PROXY_CORS</code>.</li>
   </ul>
@@ -105,7 +105,7 @@ curl '<span class="origin"></span>/?url=https://api.github.com'</code></pre>
 
   function requestURL() {
     const base = origin + '/?url=' + encodeURIComponent(input.value.trim() || fallback);
-    return forward.checked ? base + '&forward_ip=true' : base;
+    return forward.checked ? base + '&forward=true' : base;
   }
 
   function render() {

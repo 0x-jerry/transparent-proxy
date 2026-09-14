@@ -33,7 +33,7 @@ Only `GET` and `HEAD` are forwarded (`OPTIONS` answers CORS preflight); other me
 - The target must be an absolute `http` or `https` URL with no credentials.
 - Upstream status codes and redirects are passed through unchanged.
 - Request and response bodies are streamed; hop-by-hop headers are stripped.
-- The client IP is never sent upstream unless `forward_ip=true` is passed, which sets `X-Forwarded-For` to the caller's address.
+- Remote identity headers (`Forwarded`, all `X-Forwarded-*`, `X-Real-IP`, `X-Client-IP`, `X-Originating-IP`, `X-Remote-IP`, `X-Remote-Addr`, `Client-IP`, `True-Client-IP`, `CF-Connecting-IP`, `Fastly-Client-IP`, `X-Cluster-Client-IP`) are stripped unless `forward=true` is passed, which forwards them and appends the caller's address to `X-Forwarded-For`.
 - Transport failures return `502`, timeouts return `504`.
 
 ## Docker

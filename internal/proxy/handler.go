@@ -93,14 +93,12 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, target *url.UR
 	}
 	copyHeader(req.Header, r.Header)
 	removeHopByHop(req.Header)
-	// Drop client-supplied address headers so they cannot be spoofed.
-	for _, name := range []string{"Forwarded", "X-Forwarded-For", "X-Real-Ip"} {
-		req.Header.Del(name)
-	}
-	if forwardsRemoteIP(r) {
+	if shouldForward(r) {
 		if ip := clientIP(r); ip != "" {
-			req.Header.Set("X-Forwarded-For", ip)
+			req.Header.Add("X-Forwarded-For", ip)
 		}
+	} else {
+		removeRemoteHeaders(req.Header)
 	}
 
 	resp, err := h.Client.Do(req)
@@ -151,8 +149,32 @@ func (h *Handler) logError(r *http.Request, target *url.URL, status int, err err
 	)
 }
 
-func forwardsRemoteIP(r *http.Request) bool {
-	forward, err := strconv.ParseBool(r.URL.Query().Get("forward_ip"))
+// removeRemoteHeaders drops everything that fingerprints the caller's network origin.
+func removeRemoteHeaders(header http.Header) {
+	for name := range header {
+		if strings.HasPrefix(name, "X-Forwarded-") {
+			header.Del(name)
+		}
+	}
+	for _, name := range []string{
+		"Forwarded",
+		"X-Real-Ip",
+		"X-Client-Ip",
+		"X-Originating-Ip",
+		"X-Remote-Ip",
+		"X-Remote-Addr",
+		"Client-Ip",
+		"True-Client-Ip",
+		"Cf-Connecting-Ip",
+		"Fastly-Client-Ip",
+		"X-Cluster-Client-Ip",
+	} {
+		header.Del(name)
+	}
+}
+
+func shouldForward(r *http.Request) bool {
+	forward, err := strconv.ParseBool(r.URL.Query().Get("forward"))
 	return err == nil && forward
 }
 
