@@ -1,0 +1,11 @@
+services:
+  transparent-proxy:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      PROXY_ADDR: "0.0.0.0:8080"
+      PROXY_TIMEOUT: "30s"
+      PROXY_INSECURE_TLS: "false"
+      PROXY_CORS: "true"
+    restart: unless-stopped

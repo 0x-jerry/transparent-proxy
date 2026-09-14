@@ -44,6 +44,13 @@ docker run --rm -p 8080:8080 transparent-proxy
 
 The image binds `0.0.0.0:8080` and includes CA certificates; override any setting with `-e`, e.g. `-e PROXY_TIMEOUT=0`.
 
+Or use the bundled `docker-compose.yml`:
+
+```sh
+docker compose up --build
+docker compose down
+```
+
 ## Development
 
 ```sh
