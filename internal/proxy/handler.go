@@ -6,12 +6,13 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
+
+	"github.com/enetx/g"
+	"github.com/enetx/surf"
 )
 
 var hopByHop = map[string]bool{
@@ -26,7 +27,7 @@ var hopByHop = map[string]bool{
 }
 
 type Handler struct {
-	Client *http.Client
+	Client *surf.Client
 	Logger *slog.Logger
 	CORS   bool
 }
@@ -86,44 +87,51 @@ func (h *Handler) serveIndex(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) forward(w http.ResponseWriter, r *http.Request, target *url.URL) {
 	start := time.Now()
 
-	req, err := http.NewRequestWithContext(r.Context(), r.Method, target.String(), nil)
-	if err != nil {
-		http.Error(w, "bad gateway", http.StatusBadGateway)
-		return
-	}
-	copyHeader(req.Header, r.Header)
-	removeHopByHop(req.Header)
-	if shouldForward(r) {
-		if ip := clientIP(r); ip != "" {
-			req.Header.Add("X-Forwarded-For", ip)
-		}
+	var req *surf.Request
+	if r.Method == http.MethodHead {
+		req = h.Client.Head(g.String(target.String()))
 	} else {
-		removeRemoteHeaders(req.Header)
+		req = h.Client.Get(g.String(target.String()))
+	}
+	req.WithContext(r.Context())
+
+	out := make(http.Header, len(r.Header))
+	copyHeader(out, r.Header)
+	removeHopByHop(out)
+	removeRemoteHeaders(out)
+	for name, values := range out {
+		for _, value := range values {
+			req.AddHeaders(name, value)
+		}
 	}
 
-	resp, err := h.Client.Do(req)
-	if err != nil {
+	result := req.Do()
+	if result.IsErr() {
 		status := http.StatusBadGateway
-		if errors.Is(err, context.DeadlineExceeded) {
+		if result.ErrIs(context.DeadlineExceeded) {
 			status = http.StatusGatewayTimeout
 		}
-		h.logError(r, target, status, err)
+		h.logError(r, target, status, result.Err())
 		http.Error(w, http.StatusText(status), status)
 		return
 	}
-	defer resp.Body.Close()
 
-	copyHeader(w.Header(), resp.Header)
+	resp := result.Ok()
+	if resp.Body != nil {
+		defer resp.Body.Close()
+	}
+
+	copyHeader(w.Header(), http.Header(resp.Headers))
 	removeHopByHop(w.Header())
 	if h.CORS {
 		// Upstream may send its own CORS headers; ours must win.
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 	}
-	w.WriteHeader(resp.StatusCode)
+	w.WriteHeader(int(resp.StatusCode))
 
-	if r.Method != http.MethodHead {
-		if _, err := io.Copy(w, resp.Body); err != nil {
-			h.logError(r, target, resp.StatusCode, err)
+	if r.Method != http.MethodHead && resp.Body != nil {
+		if _, err := io.Copy(w, resp.Body.Reader); err != nil {
+			h.logError(r, target, int(resp.StatusCode), err)
 		}
 	}
 
@@ -131,7 +139,7 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, target *url.UR
 		h.Logger.Info("proxied",
 			"method", r.Method,
 			"target", target.String(),
-			"status", resp.StatusCode,
+			"status", int(resp.StatusCode),
 			"duration", time.Since(start),
 		)
 	}
@@ -171,19 +179,6 @@ func removeRemoteHeaders(header http.Header) {
 	} {
 		header.Del(name)
 	}
-}
-
-func shouldForward(r *http.Request) bool {
-	forward, err := strconv.ParseBool(r.URL.Query().Get("forward"))
-	return err == nil && forward
-}
-
-func clientIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }
 
 func parseTarget(raw string) (*url.URL, error) {

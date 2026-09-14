@@ -26,8 +26,6 @@
     color: inherit;
   }
   input { flex: 1 1 22rem; }
-  label.check { flex: 1 1 100%; display: flex; align-items: center; gap: .5rem; font-weight: 400; font-size: .9rem; }
-  label.check input { flex: 0 0 auto; width: auto; padding: 0; border: none; }
   button { cursor: pointer; font-weight: 600; }
   button:hover { border-color: currentColor; }
   code, pre, .preview {
@@ -62,10 +60,6 @@
     <label for="u">Target URL</label>
     <input id="u" type="url" placeholder="https://proxy.com/xxx" autocomplete="off" required>
     <button type="submit" id="copy">Copy</button>
-    <label class="check" for="forward">
-      <input id="forward" type="checkbox">
-      Forward client identity (<code>forward=true</code>)
-    </label>
   </form>
 
   <span class="preview">Request: <span id="preview"></span></span>
@@ -84,8 +78,8 @@ curl '<span class="origin"></span>/?url=https://api.github.com'</code></pre>
   <h2>Notes</h2>
   <ul>
     <li>Methods: <code>GET</code> and <code>HEAD</code> only; <code>OPTIONS</code> answers preflight.</li>
-    <li>Redirects and upstream status codes are passed through untouched.</li>
-    <li>Remote identity headers are stripped; append <code>&amp;forward=true</code> to forward them and add the caller's address as <code>X-Forwarded-For</code>.</li>
+    <li>Redirects are followed and the final response is returned.</li>
+    <li>Remote identity headers are stripped before the request reaches the upstream.</li>
     <li>Response bodies are streamed, so large files work.</li>
     <li>Configuration is via environment variables: <code>PROXY_ADDR</code>, <code>PROXY_TIMEOUT</code>, <code>PROXY_INSECURE_TLS</code>, <code>PROXY_CORS</code>.</li>
   </ul>
@@ -97,15 +91,13 @@ curl '<span class="origin"></span>/?url=https://api.github.com'</code></pre>
   const input = document.getElementById('u');
   const preview = document.getElementById('preview');
   const button = document.getElementById('copy');
-  const forward = document.getElementById('forward');
   const origin = location.origin;
   const fallback = 'https://proxy.com/xxx';
 
   document.querySelectorAll('.origin').forEach(el => { el.textContent = origin; });
 
   function requestURL() {
-    const base = origin + '/?url=' + encodeURIComponent(input.value.trim() || fallback);
-    return forward.checked ? base + '&forward=true' : base;
+    return origin + '/?url=' + encodeURIComponent(input.value.trim() || fallback);
   }
 
   function render() {
@@ -127,7 +119,6 @@ curl '<span class="origin"></span>/?url=https://api.github.com'</code></pre>
   }
 
   input.addEventListener('input', render);
-  forward.addEventListener('change', render);
   form.addEventListener('submit', async event => {
     event.preventDefault();
     try {

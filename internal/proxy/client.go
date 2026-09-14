@@ -1,21 +1,17 @@
 package proxy
 
 import (
-	"crypto/tls"
-	"net/http"
 	"time"
+
+	"github.com/enetx/surf"
 )
 
-func NewClient(timeout time.Duration, insecureTLS bool) *http.Client {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: insecureTLS}
-
-	return &http.Client{
-		Transport: transport,
-		Timeout:   timeout,
-		// Relay redirects to the caller instead of following them.
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
+func NewClient(timeout time.Duration, insecureTLS bool) *surf.Client {
+	builder := surf.NewClient().Builder().
+		Timeout(timeout).
+		Impersonate().Chrome()
+	if !insecureTLS {
+		builder = builder.SecureTLS()
 	}
+	return builder.Build().Unwrap()
 }
