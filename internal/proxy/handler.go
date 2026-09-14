@@ -6,8 +6,10 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -91,9 +93,14 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, target *url.UR
 	}
 	copyHeader(req.Header, r.Header)
 	removeHopByHop(req.Header)
-	// Never expose the client's address to the upstream.
+	// Drop client-supplied address headers so they cannot be spoofed.
 	for _, name := range []string{"Forwarded", "X-Forwarded-For", "X-Real-Ip"} {
 		req.Header.Del(name)
+	}
+	if forwardsRemoteIP(r) {
+		if ip := clientIP(r); ip != "" {
+			req.Header.Set("X-Forwarded-For", ip)
+		}
 	}
 
 	resp, err := h.Client.Do(req)
@@ -142,6 +149,19 @@ func (h *Handler) logError(r *http.Request, target *url.URL, status int, err err
 		"status", status,
 		"error", err,
 	)
+}
+
+func forwardsRemoteIP(r *http.Request) bool {
+	forward, err := strconv.ParseBool(r.URL.Query().Get("forward_ip"))
+	return err == nil && forward
+}
+
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 func parseTarget(raw string) (*url.URL, error) {

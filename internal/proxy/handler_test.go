@@ -80,6 +80,30 @@ func TestProxyStripsClientIPHeaders(t *testing.T) {
 	}
 }
 
+func TestProxyForwardsRemoteIPWhenRequested(t *testing.T) {
+	headers := make(chan http.Header, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		headers <- r.Header.Clone()
+	}))
+	defer upstream.Close()
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/?url="+url.QueryEscape(upstream.URL)+"&forward_ip=true", nil)
+	req.Header.Set("X-Forwarded-For", "203.0.113.7")
+	newHandler(true).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	received := <-headers
+	if got := received.Get("X-Forwarded-For"); got != "192.0.2.1" {
+		t.Errorf("X-Forwarded-For = %q, want the remote address", got)
+	}
+	if got := received.Get("X-Real-Ip"); got != "" {
+		t.Errorf("X-Real-Ip = %q, want stripped", got)
+	}
+}
+
 func TestProxyHeadHasNoBody(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "should not appear")
