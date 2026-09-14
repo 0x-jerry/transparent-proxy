@@ -55,6 +55,8 @@ docker compose down
 
 ## Development
 
+Requires Go 1.27 or newer.
+
 ```sh
 go build ./...
 go vet ./...
