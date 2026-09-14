@@ -35,6 +35,15 @@ Only `GET` and `HEAD` are forwarded (`OPTIONS` answers CORS preflight); other me
 - Request and response bodies are streamed; hop-by-hop headers are stripped.
 - Transport failures return `502`, timeouts return `504`.
 
+## Docker
+
+```sh
+docker build -t transparent-proxy .
+docker run --rm -p 8080:8080 transparent-proxy
+```
+
+The image binds `0.0.0.0:8080` and includes CA certificates; override any setting with `-e`, e.g. `-e PROXY_TIMEOUT=0`.
+
 ## Development
 
 ```sh
