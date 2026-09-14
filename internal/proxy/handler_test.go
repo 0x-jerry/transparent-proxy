@@ -56,6 +56,30 @@ func TestProxyGet(t *testing.T) {
 	}
 }
 
+func TestProxyStripsClientIPHeaders(t *testing.T) {
+	headers := make(chan http.Header, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		headers <- r.Header.Clone()
+	}))
+	defer upstream.Close()
+
+	rec := proxyRequest(t, newHandler(false), http.MethodGet, upstream.URL, http.Header{
+		"X-Forwarded-For": {"203.0.113.7"},
+		"X-Real-Ip":       {"203.0.113.7"},
+		"Forwarded":       {"for=203.0.113.7"},
+	})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+
+	received := <-headers
+	for _, name := range []string{"X-Forwarded-For", "X-Real-Ip", "Forwarded"} {
+		if got := received.Get(name); got != "" {
+			t.Errorf("%s = %q, want stripped", name, got)
+		}
+	}
+}
+
 func TestProxyHeadHasNoBody(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		io.WriteString(w, "should not appear")

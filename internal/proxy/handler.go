@@ -91,6 +91,10 @@ func (h *Handler) forward(w http.ResponseWriter, r *http.Request, target *url.UR
 	}
 	copyHeader(req.Header, r.Header)
 	removeHopByHop(req.Header)
+	// Never expose the client's address to the upstream.
+	for _, name := range []string{"Forwarded", "X-Forwarded-For", "X-Real-Ip"} {
+		req.Header.Del(name)
+	}
 
 	resp, err := h.Client.Do(req)
 	if err != nil {
