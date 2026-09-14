@@ -5,19 +5,19 @@ A small Go server that fetches a URL for you and streams the response back, with
 ## Usage
 
 ```
-http://localhost:8080/?url=https://proxy.com/xxx
+http://localhost:8080/https://proxy.com/xxx
 ```
 
 ```sh
 go run ./cmd/transparent-proxy
-curl 'http://localhost:8080/?url=https://example.com'
+curl 'http://localhost:8080/https://example.com'
 ```
 
 Open <http://localhost:8080/> in a browser for an interactive guide.
 
 Only `GET` and `HEAD` are forwarded (`OPTIONS` answers CORS preflight); other methods return `405`.
 
-> The path form `http://localhost:8080/https://proxy.com/xxx` is intentionally **not** supported — the target always goes in the `url` query parameter.
+The target is the request path, so its own query string is preserved: `/https://example.com/search?q=go`.
 
 ## Configuration
 
@@ -30,7 +30,7 @@ Only `GET` and `HEAD` are forwarded (`OPTIONS` answers CORS preflight); other me
 
 ## Behavior
 
-- The target must be an absolute `http` or `https` URL with no credentials.
+- The target is the request path (leading `/` stripped) and must be an absolute `http` or `https` URL with no credentials.
 - Redirects are followed and the final upstream response is returned.
 - Request and response bodies are streamed; hop-by-hop headers are stripped.
 - Remote identity headers (`Forwarded`, all `X-Forwarded-*`, `X-Real-IP`, `X-Client-IP`, `X-Originating-IP`, `X-Remote-IP`, `X-Remote-Addr`, `Client-IP`, `True-Client-IP`, `CF-Connecting-IP`, `Fastly-Client-IP`, `X-Cluster-Client-IP`) are stripped before the request is sent upstream.

@@ -48,13 +48,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	raw := r.URL.Query().Get("url")
-	if raw == "" {
+	if r.URL.Path == "/" || r.URL.Path == "/index.html" {
 		h.serveIndex(w, r)
 		return
 	}
 
-	target, err := parseTarget(raw)
+	target, err := parseTarget(targetURL(r))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -76,10 +75,6 @@ func (h *Handler) servePreflight(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) serveIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" && r.URL.Path != "/index.html" {
-		http.NotFound(w, r)
-		return
-	}
 	w.Header().Set("Cache-Control", "no-store")
 	http.ServeContent(w, r, "index.html", time.Time{}, bytes.NewReader(indexHTML))
 }
@@ -179,6 +174,14 @@ func removeRemoteHeaders(header http.Header) {
 	} {
 		header.Del(name)
 	}
+}
+
+func targetURL(r *http.Request) string {
+	target := strings.TrimPrefix(r.URL.EscapedPath(), "/")
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	return target
 }
 
 func parseTarget(raw string) (*url.URL, error) {

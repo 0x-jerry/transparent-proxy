@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -22,7 +21,7 @@ func newHandler(cors bool) *Handler {
 func proxyRequest(t *testing.T, h *Handler, method, target string, header http.Header) *httptest.ResponseRecorder {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(method, "/?url="+url.QueryEscape(target), nil)
+	req := httptest.NewRequest(method, "/"+target, nil)
 	for name, values := range header {
 		for _, value := range values {
 			req.Header.Add(name, value)
@@ -53,6 +52,19 @@ func TestProxyGet(t *testing.T) {
 	}
 	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "*" {
 		t.Fatalf("ACAO = %q", got)
+	}
+}
+
+func TestProxyPreservesTargetQuery(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, r.URL.RawQuery)
+	}))
+	defer upstream.Close()
+
+	rec := proxyRequest(t, newHandler(false), http.MethodGet, upstream.URL+"/search?a=1&b=2", nil)
+
+	if rec.Code != http.StatusOK || rec.Body.String() != "a=1&b=2" {
+		t.Fatalf("status = %d body = %q", rec.Code, rec.Body.String())
 	}
 }
 
@@ -193,12 +205,12 @@ func TestIndexGuide(t *testing.T) {
 	}
 }
 
-func TestUnknownPath(t *testing.T) {
+func TestInvalidTargetPath(t *testing.T) {
 	rec := httptest.NewRecorder()
 	newHandler(true).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/nope", nil))
 
-	if rec.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404", rec.Code)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
 	}
 }
 

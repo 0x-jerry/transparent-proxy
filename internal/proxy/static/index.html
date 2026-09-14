@@ -66,17 +66,18 @@
 
   <h2>How it works</h2>
   <p>
-    Pass the target as the <code>url</code> query parameter. The server fetches it
+    Append the target URL directly after the server address. The server fetches it
     and streams the response back, CORS-enabled, so browser code can read it.
   </p>
 
   <h2>Examples</h2>
-  <pre><code>curl '<span class="origin"></span>/?url=https://example.com'
-curl -I '<span class="origin"></span>/?url=https://httpbin.org/get'
-curl '<span class="origin"></span>/?url=https://api.github.com'</code></pre>
+  <pre><code>curl '<span class="origin"></span>/https://example.com'
+curl -I '<span class="origin"></span>/https://httpbin.org/get'
+curl '<span class="origin"></span>/https://api.github.com'</code></pre>
 
   <h2>Notes</h2>
   <ul>
+    <li>The target is the request path; its own query string is preserved.</li>
     <li>Methods: <code>GET</code> and <code>HEAD</code> only; <code>OPTIONS</code> answers preflight.</li>
     <li>Redirects are followed and the final response is returned.</li>
     <li>Remote identity headers are stripped before the request reaches the upstream.</li>
@@ -97,7 +98,7 @@ curl '<span class="origin"></span>/?url=https://api.github.com'</code></pre>
   document.querySelectorAll('.origin').forEach(el => { el.textContent = origin; });
 
   function requestURL() {
-    return origin + '/?url=' + encodeURIComponent(input.value.trim() || fallback);
+    return origin + '/' + (input.value.trim() || fallback);
   }
 
   function render() {
