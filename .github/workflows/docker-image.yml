@@ -1,0 +1,15 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches: [main]
+    tags: ['*']
+
+jobs:
+  build:
+    uses: 0x-jerry/workflows/.github/workflows/build-docker.yml@main
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
